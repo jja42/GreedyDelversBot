@@ -5,7 +5,7 @@ import asyncio
 import string #TEMP
 from PIL import Image
 
-#Bot token
+#Load Bot Token and Server ID
 with open("BotToken.txt", "r") as f:
     token = f.read().strip()
     
@@ -261,6 +261,7 @@ class game():
 						i += 1
 						if i == num:
 							p.target = t
+							t.targetedBy = p
 	
 	#Clears Turn Parameters for Players and Game		
 	def turn_clear(self):
@@ -268,6 +269,7 @@ class game():
 			p.played_card = None
 			p.draw = False
 			p.target = None
+			p.targetedBy = None
 			p.turn_done = False
 			p.minionNegated = False
 			p.minionGain = 0
@@ -328,7 +330,7 @@ class game():
 					else:
 						s += p.name + "'s Minion was Unsuccessful.\n"
 			s += "Player: " + p.name + " Gained " + str(p.goldGain) +" Gold\n\n"
-		s += "Players Delve Deeper into the Mines, Progressing Forward 1 Floor and Gain 3 Gold\n\n"
+		s += "Players Delve Deeper into the Mines, Progressing Forward 1 Floor and Gaining 3 Gold\n\n"
 	
 	#Gets available targets for player
 	def get_targets(self, user_name):
@@ -376,8 +378,8 @@ class game():
 				exchange_counter += 1
 			if 	self.played_cards[key].card_type == "Minion":
 				player = self.get_player(key)
+				player.gold -= player.played_card.cost
 				minion_players.append(player)
-				minions.append(self.played_cards[key])
 		for p in exchange_players:
 			if exchange_counter == 1:
 				p.gold += p.ore
@@ -390,7 +392,7 @@ class game():
 				p.ore = p.ore // 3
 			if exchange_counter == 4:
 				p.ore = 0
-		self.resolveMinions(minion_players,minions)
+		self.resolveMinions(minion_players)
 		self.turn_clear()
 		self.next_turn()
 		
@@ -413,11 +415,44 @@ class game():
 		for p in players:
 			targets.append(p.target)
 		
-		# If 3 or More minions are played, all with different targets
+		#If 3 or More minions are played, all with different targets
 		if(len(players) >= 3 && len(set(targets)) == len(players)):
 			for p in players:
 				p.minionNegated = True
 			return #All Minions Negated
+		
+		#If 4 minions are played, with one player left untargeted
+		notTargeted = 0
+		if(len(players) == 4):
+			for p in players:
+				if p.targetedBy == None:
+					notTargeted += 1
+			if(notTargeted == 1):
+				for p in players:
+					if p.targetedBy != None:
+						p.minionNegated = True
+					else:
+						self.resolveMinion(p)
+	
+	def resolveMinion(self,player):
+		dieRoll = random.randint(1,6)
+		stolen = 0
+		if player.played_card.name == "Goblin":
+			if dieRoll >= 4:
+				stolen = player.target.steal_gold(2)
+				player.minionSuccess = True
+		if player.played_card.name == "Hitman":
+			if dieRoll >= 3:
+				stolen = player.target.steal_gold(6)
+				player.minionSuccess = True
+		if player.played_card.name == "Savage":
+			if dieRoll >= 4:
+				stolen = player.target.steal_gold(12)
+				player.minionSuccess = True
+		player.gold += stolen
+		player.minionGain = stolen
+		player.minionRoll = dieRoll
+			
 
 class player():
 	def __init__(self,name):
@@ -436,6 +471,7 @@ class player():
 		self.minionGain = 0
 		self.goldGain = 0
 		self.floorGain = 0
+		self.targetedBy = None
 		
 	#When a player clicks to play a card, the card they played is logged and removed from their hand
 	def play_card(self, index):
@@ -452,6 +488,17 @@ class player():
 		for c in self.hand:
 			files.append(c.image)
 		merge_all(files)
+	
+	#Attempt to take as much gold as possible
+	def steal_gold(self, amount):
+		stolen = 0
+		if self.gold >= amount:
+			self.gold -= amount
+			return amount
+		else:
+			stolen = self.gold
+			self.gold = 0
+			return stolen
 
 class card():
 	def __init__ (self,name,card_type,cost,image):

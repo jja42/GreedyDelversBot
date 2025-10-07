@@ -2,6 +2,7 @@ import discord
 from discord import app_commands
 import random
 import asyncio
+import string #TEMP
 from PIL import Image
 
 #Bot token
@@ -70,7 +71,7 @@ class draw_menu(discord.ui.View):
 		current_game = games[self.game_id]
 		if current_game.check_users(interaction.user.name):
 			if current_game.check_draw(interaction.user.name):
-				 interaction.response.send_message("You've drawn already!",ephemeral = True)
+				 await interaction.response.send_message("You've drawn already!",ephemeral = True)
 			else:
 				current_game.player_draw(interaction.user.name)
 				picture = discord.File('GeneratedImage.png')
@@ -81,187 +82,102 @@ class draw_menu(discord.ui.View):
 
 #Displays buttons for each playable card
 class play_menu(discord.ui.View):
-	def __init__(self,game_id):
-		super().__init__()
-		self.game_id = game_id
-  
-    #Play card 1
-	@discord.ui.button(label = "Play 1st Card", style = discord.ButtonStyle.gray)
-	async def menu1(self,interaction: discord.Interaction,button: discord.ui.Button):
-		current_game = games[self.game_id]
-		if current_game.check_users(interaction.user.name):
-			if current_game.check_play(interaction.user.name):
-				await interaction.response.send_message("You've already played a card!",ephemeral = True)
-			else:
-				if(current_game.check_cost(interaction.user.name,0)):
-					current_game.player_play(interaction.user.name, 0)
-					card = current_game.get_played_card(interaction.user.name)
-					if(card.card_type == "Minion"):
-						text = current_game.get_targets(interaction.user.name)
-						menu = target_menu(current_game.id,interaction.user.name)
-						await interaction.response.send_message(text,view = menu,ephemeral = True)
-					else:
-						current_game.player_done(interaction.user.name)
-						if current_game.check_turn():
-							current_game.calculate_game_state()
-							current_game.get_game_state()
-							menu = draw_menu(current_game.id)
-							await interaction.response.send_message(current_game.game_state, view = menu)
+    def __init__(self, game_id, num_cards=4):
+        super().__init__()
+        self.game_id = game_id
+
+        # Dynamically create buttons for however many cards are in the hand
+        for i in range(num_cards):
+            button = discord.ui.Button(
+                label=f"Play Card {i+1}",
+                style=discord.ButtonStyle.gray
+            )
+            button.callback = self.make_play_callback(i)
+            self.add_item(button)
+
+    def make_play_callback(self, index):
+        async def callback(interaction: discord.Interaction):
+            current_game = games[self.game_id]
+            if current_game.check_users(interaction.user.name):
+                if current_game.check_play(interaction.user.name):
+                    await interaction.response.send_message("You've already played a card!", ephemeral=True)
+                    return
+
+                if current_game.check_cost(interaction.user.name, index):
+                    current_game.player_play(interaction.user.name, index)
+                    card = current_game.get_played_card(interaction.user.name)
+
+                    if card.card_type == "Minion":
+                        targets = current_game.get_targets(interaction.user.name)
+                        menu = target_menu(current_game.id, interaction.user.name, targets)
+                        await interaction.response.send_message("Select a Target for your Minion",view=menu, ephemeral=True)
+                    else:
+                        current_game.player_done(interaction.user.name)
+                        if current_game.check_turn():
+                            current_game.calculate_game_state()
+                            current_game.get_game_state()
+                            menu = draw_menu(current_game.id)
+                        if(current_game.end):
+							text = current_game.game_state
+							text += "\n The winner is: "
+							text += current_game.get_winner().name
+							await interaction.response.send_message(text)
 						else:
-							await interaction.response.send_message("Successfully played a card. Please wait for others to finish",ephemeral = True)
-				else:
-					await interaction.response.send_message("You don't have enough gold to play this card!",ephemeral = True)
-	
-	#Play card 2
-	@discord.ui.button(label = "Play 2nd Card", style = discord.ButtonStyle.gray)
-	async def menu2(self,interaction: discord.Interaction,button: discord.ui.Button):
-		current_game = games[self.game_id]
-		if current_game.check_users(interaction.user.name):
-			if current_game.check_play(interaction.user.name):
-				await interaction.response.send_message("You've already played a card!",ephemeral = True)
-			else:
-				if(current_game.check_cost(interaction.user.name, 1)):
-					current_game.player_play(interaction.user.name, 1)
-					card = current_game.get_played_card(interaction.user.name)
-					if(card.card_type == "Minion"):
-						text = current_game.get_targets(interaction.user.name)
-						menu = target_menu(current_game.id,interaction.user.name)
-						await interaction.response.send_message(text,view = menu,ephemeral = True)
-					else:
-						current_game.player_done(interaction.user.name)
-						if current_game.check_turn():
-							current_game.calculate_game_state()
-							current_game.get_game_state()
-							menu = draw_menu(current_game.id)
-							await interaction.response.send_message(current_game.game_state, view = menu)
-						else:
-							await interaction.response.send_message("Successfully played a card. Please wait for others to finish",ephemeral = True)
-				else:
-					await interaction.response.send_message("You don't have enough gold to play this card!",ephemeral = True)
-	
-	#Play card 3
-	@discord.ui.button(label = "Play 3rd Card", style = discord.ButtonStyle.gray)
-	async def menu3(self,interaction: discord.Interaction,button: discord.ui.Button):
-		current_game = games[self.game_id]
-		if current_game.check_users(interaction.user.name):
-			if current_game.check_play(interaction.user.name):
-				await interaction.response.send_message("You've already played a card!",ephemeral = True)
-			else:
-				if(current_game.check_cost(interaction.user.name, 2)):
-					current_game.player_play(interaction.user.name, 2)
-					card = current_game.get_played_card(interaction.user.name)
-					if(card.card_type == "Minion"):
-						text = current_game.get_targets(interaction.user.name)
-						menu = target_menu(current_game.id,interaction.user.name)
-						await interaction.response.send_message(text,view = menu,ephemeral = True)
-					else:
-						current_game.player_done(interaction.user.name)
-						if current_game.check_turn():
-							current_game.calculate_game_state()
-							current_game.get_game_state()
-							menu = draw_menu(current_game.id)
-							await interaction.response.send_message(current_game.game_state, view = menu)
-						else:
-							await interaction.response.send_message("Successfully played a card. Please wait for others to finish",ephemeral = True)
-				else:
-					await interaction.response.send_message("You don't have enough gold to play this card!",ephemeral = True)
-		else:
-			await interaction.response.send_message("You're not in this game!",ephemeral = True)
-	
-	#Play card 4
-	@discord.ui.button(label = "Play 4th Card", style = discord.ButtonStyle.gray)
-	async def menu4(self,interaction: discord.Interaction,button: discord.ui.Button):
-		current_game = games[self.game_id]
-		if current_game.check_users(interaction.user.name):
-			if current_game.check_play(interaction.user.name):
-				await interaction.response.send_message("You've already played a card!",ephemeral = True)
-			else:
-				if(current_game.check_cost(interaction.user.name, 3)):
-					current_game.player_play(interaction.user.name, 3)
-					card = current_game.get_played_card(interaction.user.name)
-					if(card.card_type == "Minion"):
-						text = current_game.get_targets(interaction.user.name)
-						menu = target_menu(current_game.id,interaction.user.name)
-						await interaction.response.send_message(text,view = menu,ephemeral = True)
-					else:
-						current_game.player_done(interaction.user.name)
-						if current_game.check_turn():
-							current_game.calculate_game_state()
-							current_game.get_game_state()
-							menu = draw_menu(current_game.id)
-							await interaction.response.send_message(current_game.game_state, view = menu)
-						else:
-							await interaction.response.send_message("Successfully played a card. Please wait for others to finish",ephemeral = True)
-				else:
-					await interaction.response.send_message("You don't have enough gold to play this card!",ephemeral = True)
-		else:
-			await interaction.response.send_message("You're not in this game!",ephemeral = True)
+                            await interaction.response.send_message(current_game.game_state, view=menu)
+                        else:
+                            await interaction.response.send_message(
+                                "Successfully played a card. Please wait for others to finish",
+                                ephemeral=True
+                            )
+                else:
+                    await interaction.response.send_message("You don't have enough gold to play this card!", ephemeral=True)
+            else:
+                await interaction.response.send_message("You're not in this game!", ephemeral=True)
+
+        return callback
 
 #Displays buttons for each targetable player, excluding self
 class target_menu(discord.ui.View):
-	def __init__(self,game_id,player):
-		super().__init__()
-		self.game_id = game_id
+    def __init__(self, game_id, player, targets):
+        super().__init__()
+        self.game_id = game_id
+        self.targets = targets
 
-	#Target 1st Player
-	@discord.ui.button(label = "Target Player 1", style = discord.ButtonStyle.gray)
-	async def menu1(self,interaction: discord.Interaction,button: discord.ui.Button):
-		current_game = games[self.game_id]
-		if current_game.check_users(interaction.user.name):
-			if current_game.check_target(interaction.user.name):
-				await interaction.response.send_message("You've already selected a target!",ephemeral = True)
-			else:
-				current_game.player_target(interaction.user.name,1)
-				current_game.player_done(interaction.user.name)
-				if current_game.check_turn():
-					current_game.calculate_game_state()
-					current_game.get_game_state()
-					menu = draw_menu(current_game.id)
-					await interaction.response.send_message(current_game.game_state, view = menu)
-				else:
-					await interaction.response.send_message("Successfully played a card. Please wait for others to finish",ephemeral = True)
-		else:
-			await interaction.response.send_message("You're not in this game!",ephemeral = True)
-	
-	#Target 2nd Player
-	@discord.ui.button(label = "Target Player 2", style = discord.ButtonStyle.gray)
-	async def menu2(self,interaction: discord.Interaction,button: discord.ui.Button):
-		current_game = games[self.game_id]
-		if current_game.check_users(interaction.user.name):
-			if current_game.check_target(interaction.user.name):
-				await interaction.response.send_message("You've already selected a target!",ephemeral = True)
-			else:
-				current_game.player_target(interaction.user.name,2)
-				current_game.player_done(interaction.user.name)
-				if current_game.check_turn():
-					current_game.calculate_game_state()
-					current_game.get_game_state()
-					menu = draw_menu(current_game.id)
-					await interaction.response.send_message(current_game.game_state, view = menu)
-				else:
-					await interaction.response.send_message("Successfully played a card. Please wait for others to finish",ephemeral = True)
-		else:
-			await interaction.response.send_message("You're not in this game!",ephemeral = True)
-	
-	#Target 3rd Player
-	@discord.ui.button(label = "Target Player 3", style = discord.ButtonStyle.gray)
-	async def menu3(self,interaction: discord.Interaction,button: discord.ui.Button):
-		current_game = games[self.game_id]
-		if current_game.check_users(interaction.user.name):
-			if current_game.check_target(interaction.user.name):
-				await interaction.response.send_message("You've already selected a target!",ephemeral = True)
-			else:
-				current_game.player_target(interaction.user.name,3)
-				current_game.player_done(interaction.user.name)
-				if current_game.check_turn():
-					current_game.calculate_game_state()
-					current_game.get_game_state()
-					menu = draw_menu(current_game.id)
-					await interaction.response.send_message(current_game.game_state, view = menu)
-				else:
-					await interaction.response.send_message("Successfully played a card. Please wait for others to finish",ephemeral = True)
-		else:
-			await interaction.response.send_message("You're not in this game!",ephemeral = True)
+        # Dynamically add buttons based on the target list
+        for i, t in enumerate(targets):
+            button = discord.ui.Button(
+                label=f"Target {t}",
+                style=discord.ButtonStyle.gray
+            )
+            button.callback = self.make_target_callback(i)
+            self.add_item(button)
+
+    def make_target_callback(self, index):
+        async def callback(interaction: discord.Interaction):
+            current_game = games[self.game_id]
+            if current_game.check_users(interaction.user.name):
+                if current_game.check_target(interaction.user.name):
+                    await interaction.response.send_message("You've already selected a target!", ephemeral=True)
+                else:
+                    current_game.player_target(interaction.user.name, index + 1)
+                    current_game.player_done(interaction.user.name)
+                    if current_game.check_turn():
+                        current_game.calculate_game_state()
+                        current_game.get_game_state()
+                        menu = draw_menu(current_game.id)
+                        if(current_game.end):
+							text = current_game.game_state
+							text += "\n The winner is: "
+							text += current_game.get_winner().name
+							await interaction.response.send_message(text)
+						else:
+                            await interaction.response.send_message(current_game.game_state, view=menu)
+                    else:
+                        await interaction.response.send_message("Successfully played a card. Please wait for others to finish", ephemeral=True)
+            else:
+                await interaction.response.send_message("You're not in this game!", ephemeral=True)
+        return callback
+
 
 class game():
 	def __init__(self, host):
@@ -272,6 +188,9 @@ class game():
 		self.deck = init_deck()
 		self.deck = shuffle(self.deck)
 		self.played_cards = {}
+		self.turnCount = 1
+		self.endZone = []
+		self.end = False 
 	
 	#Check if the user name is included in the game's player list
 	def check_users(self, user_name):
@@ -308,18 +227,16 @@ class game():
 		for p in self.players:
 			if p.name == user_name:
 				c = p.hand[index]
-		card_cost = c.cost
-		if(card_cost > p.gold): 
-			return False
-		else:
-			return True
+				return c.cost <= p.gold
+		return False
 	
 	#Draws a card for the player and creates their hand (image)
+	#Card Pre-drawn to fix issues with clicking wrong buttons
 	def player_draw(self, user_name):
 		for p in self.players:
 			if p.name == user_name:
-				p.turn_draw(self.deck)
 				p.show_hand()
+				p.draw = True
 		
 	#Plays a card for the player at specific index in their hand, appends to played cards
 	def player_play(self, user_name, index):
@@ -343,7 +260,7 @@ class game():
 					if t.name != user_name:
 						i += 1
 						if i == num:
-							p.target = t.name
+							p.target = t
 	
 	#Clears Turn Parameters for Players and Game		
 	def turn_clear(self):
@@ -352,34 +269,88 @@ class game():
 			p.draw = False
 			p.target = None
 			p.turn_done = False
-		self.played_cards = {}
+			p.minionNegated = False
+			p.minionGain = 0
+			p.goldGain = 0
+			p.floorGain = 0
+			p.played_cards = {}
 	
+	#Progress Game State to Next Turn
+	#Also Handle Reaching the End
 	def next_turn(self):
+		self.turnCount += 1
+		players_to_remove = []
 		for p in self.players:
 			p.floor += 1
-			p.ore += 3
+			if p.floor >= 30:
+				p.floor = 30
+				self.endZone.append(p)
+				players_to_remove.append(p)
+			else:
+				p.ore += 3
+				p.turn_draw(self.deck)
+		# remove end-zone players from player list
+		for p in players_to_remove:
+			self.players.remove(p)
+		
+		if(len(self.players) == 0):
+			self.game_state = "END"
 	
 	#Initializes the starting hands for each player
 	def start_game(self):
+		while(len(self.players) <4):
+			new_player = player(''.join(random.choice(string.ascii_letters) for _ in range(5)))
+			self.players.append(new_player)
 		for p in self.players:
 			p.hand = init_hand(self.deck)
 			
 	#Parses the stats of each player and displays them on a line by line basis
 	def get_game_state(self):
-		s = ""
+		s = "Turn: " + str(self.turnCount) + "\n"
 		for p in self.players:
 			s += "Player: " + p.name + " - Floor: B" + str(p.floor) + "F  - Gold: " + str(p.gold) + " - Ore: " + str(p.ore) + "\n"
 		self.game_state = s
+		
+	def get_turn_resolution(self):
+		s = "Turn Results\n"
+		for p in self.players:
+			s += "Player: " + p.name + "Played: " + p.played_card.name + "\n"
+			if(p.floorGain > 0):
+				s += p.name + " Rushed Forward 3 Floors. Gaining 9 Ore."
+			if(p.target != None):
+				s += p.name + " Targeted " + p.target.name + "\n"
+				if(p.minionNegated):
+					s += p.name + "'s Minion Was Negated!"
+				else:
+					s += p.name + " Minion Roll Result = " + p.minionRoll + "\n"
+					if(p.minionSuccess):
+						s += p.name + "'s Minion Stole " + p.minionGold + "Gold!\n"
+					else:
+						s += p.name + "'s Minion was Unsuccessful.\n"
+			s += "Player: " + p.name + " Gained " + str(p.goldGain) +" Gold\n\n"
+		s += "Players Delve Deeper into the Mines, Progressing Forward 1 Floor and Gain 3 Gold\n\n"
 	
-	#Gets available targets for player and presents stats
+	#Gets available targets for player
 	def get_targets(self, user_name):
-		s = ""
-		i = 0
+		targets = []
 		for p in self.players:
 			if p.name != user_name:
-				i += 1
-				s += "Player" + i + ": " + p.name + " - Floor: B" + str(p.floor) + "F  - Gold: " + str(p.gold) + " - Ore: " + str(p.ore) + "\n"
-		return s
+				targets.append(p.name)
+		return targets
+
+		
+	#Gets card played by player
+	def get_played_card(self, user_name):
+		for p in self.players:
+			if p.name == user_name:
+				return self.played_cards[p.name]
+				
+	#Gets a player in the game 
+	def get_player(self, user_name):
+		for p in self.players:
+			if p.name == user_name:
+				return p
+		
 	
 	#Checks if all players have finished playing a card this turn
 	def check_turn(self):
@@ -392,15 +363,21 @@ class game():
 	def calculate_game_state(self):
 		exchange_players = []
 		exchange_counter = 0
+		minion_players = []
+		minions = []
 		for key in self.played_cards:
 			if self.played_cards[key].name == "Rush":
-				player = get_player(key)
+				player = self.get_player(key)
 				player.floor += 3
 				player.ore += 9
 			if self.played_cards[key].name == "Exchange":
-				player = get_player(key)
+				player = self.get_player(key)
 				exchange_players.append(player)
 				exchange_counter += 1
+			if 	self.played_cards[key].card_type == "Minion":
+				player = self.get_player(key)
+				minion_players.append(player)
+				minions.append(self.played_cards[key])
 		for p in exchange_players:
 			if exchange_counter == 1:
 				p.gold += p.ore
@@ -413,10 +390,34 @@ class game():
 				p.ore = p.ore // 3
 			if exchange_counter == 4:
 				p.ore = 0
-		#for key in self.played_cards:
-			#if self.played_cards[key].name == "Goblin":
-		turn_clear()
-		next_turn()
+		self.resolveMinions(minion_players,minions)
+		self.turn_clear()
+		self.next_turn()
+		
+	#Figure out the Winner
+	def get_winner(self):
+		wealth = 0
+		winner = None
+		for p in self.endZone:
+			index++
+			if p.gold > wealth:
+				weatlh = p.gold
+				winner = p
+		return winner
+		
+	#Handle Minion Resolution
+	def resolveMinions(self, players, minions):
+		if(len(players) == 0):
+			return
+		targets = []
+		for p in players:
+			targets.append(p.target)
+		
+		# If 3 or More minions are played, all with different targets
+		if(len(players) >= 3 && len(set(targets)) == len(players)):
+			for p in players:
+				p.minionNegated = True
+			return #All Minions Negated
 
 class player():
 	def __init__(self,name):
@@ -429,6 +430,12 @@ class player():
 		self.draw = False
 		self.target = None
 		self.turn_done = False
+		self.minionNegated = False
+		self.minionRoll = 0
+		self.minionSuccess = False
+		self.minionGain = 0
+		self.goldGain = 0
+		self.floorGain = 0
 		
 	#When a player clicks to play a card, the card they played is logged and removed from their hand
 	def play_card(self, index):
@@ -438,7 +445,6 @@ class player():
 	#Draws a new card at the start of a turn
 	def turn_draw(self, deck):
 		draw_card(self.hand, deck)
-		self.draw = True
 	
 	#Gets image files from cards in hand and merges them
 	def show_hand(self):
@@ -512,10 +518,10 @@ def shuffle(deck):
 		deck[index] = temp
 	return deck
 
-#Draws three cards from the deck for a beginning hand (4th drawn separately)
+#Draws three cards from the deck for a beginning hand
 def init_hand(deck):
 	hand = []
-	for x in range(3):
+	for x in range(4):
 		draw_card(hand,deck)
 	return hand
 

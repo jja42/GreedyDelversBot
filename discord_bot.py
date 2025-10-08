@@ -310,7 +310,7 @@ class game():
 	#Initializes the starting hands for each player
 	def start_game(self):
 		while(len(self.players) <4):
-			new_player = player(''.join(random.choice(string.ascii_letters) for _ in range(5)))
+			new_player = player(''.join(random.choice(string.ascii_letters) for _ in range(5)) + " (Bot)")
 			new_player.bot = True
 			self.players.append(new_player)
 		for p in self.players:

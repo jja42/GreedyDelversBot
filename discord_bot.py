@@ -427,12 +427,16 @@ class game():
 			for p in players:
 				if p.targetedBy == None:
 					notTargeted += 1
-			if(notTargeted == 1):
+			if(notTargeted == 1): #Negate all but the one player
 				for p in players:
 					if p.targetedBy != None:
 						p.minionNegated = True
 					else:
 						self.resolveMinion(p)
+		
+		#If 4 minions are played, two pairs targeting 2 targets
+		if(len(players) == 4):
+			
 	
 	def resolveMinion(self,player):
 		dieRoll = random.randint(1,6)

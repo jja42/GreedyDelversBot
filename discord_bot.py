@@ -42,7 +42,7 @@ class join_menu(discord.ui.View):
 			if len(current_game.players) < 4:
 				new_player = player(interaction.user.name)
 				current_game.players.append(new_player)
-				await interaction.response.edit_message(content = current_game.players[0].name + "Created a Game. Number of Players: " + str(len(current_game.players)))
+				await interaction.response.edit_message(content = current_game.players[0].name + " Created a Game.	Number of Human Players: " + str(len(current_game.players)) + "	Number of Bot Players: " + str(4-len(current_game.players)))
 				await interaction.followup.send("You Joined The Game",ephemeral = True)
 			else:
 				await interaction.response.send_message("Cannot Join! The Game Is Full!",ephemeral = True)
@@ -120,16 +120,14 @@ class play_menu(discord.ui.View):
 							menu = draw_menu(current_game.id)
 							if(current_game.end):
 								text = current_game.turn_state
-								text += "\n\n"
 								text += current_game.game_state
 								text += "\n\nThe Game Has Ended.\n The Winner is: "
 								text += current_game.get_winner().name
 								await interaction.response.send_message(text)
 							else:
 								text = current_game.turn_state
-								text += "\n\n"
 								text += current_game.game_state
-								await interaction.response.send_message(current_game.text, view=menu)
+								await interaction.response.send_message(text, view=menu)
 						else:
 							await interaction.response.send_message("Successfully played a card. Please wait for others to finish", ephemeral=True)
 				else:
@@ -152,17 +150,17 @@ class target_menu(discord.ui.View):
 				label=f"Target {t}",
 				style=discord.ButtonStyle.gray
 			)
-			button.callback = self.make_target_callback(i)
+			button.callback = self.make_target_callback(t)
 			self.add_item(button)
 
-	def make_target_callback(self, index):
+	def make_target_callback(self, target):
 		async def callback(interaction: discord.Interaction):
 			current_game = games[self.game_id]
 			if current_game.check_users(interaction.user.name):
 				if current_game.check_target(interaction.user.name):
 					await interaction.response.send_message("You've already selected a target!", ephemeral=True)
 				else:
-					current_game.player_target(interaction.user.name, index + 1)
+					current_game.player_target(interaction.user.name, target)
 					current_game.player_done(interaction.user.name)
 					if current_game.check_turn():
 						current_game.calculate_game_state()
@@ -172,16 +170,14 @@ class target_menu(discord.ui.View):
 						menu = draw_menu(current_game.id)
 						if(current_game.end):
 							text = current_game.turn_state
-							text += "\n\n"
 							text += current_game.game_state
 							text += "\n\nThe Game Has Ended.\n The Winner is: "
 							text += current_game.get_winner().name
 							await interaction.response.send_message(text)
 						else:
 							text = current_game.turn_state
-							text += "\n\n"
 							text += current_game.game_state
-							await interaction.response.send_message(current_game.text, view=menu)
+							await interaction.response.send_message(text, view=menu)
 					else:
 						await interaction.response.send_message("Successfully played a card. Please wait for others to finish", ephemeral=True)
 			else:
@@ -202,6 +198,7 @@ class game():
 		self.turnCount = 1
 		self.endZone = []
 		self.end = False 
+		self.exchangeCount = 0
 	
 	#Check if the user name is included in the game's player list
 	def check_users(self, user_name):
@@ -263,31 +260,31 @@ class game():
 				p.turn_done = True
 	
 	#Sets a target for a player when a minion is played			
-	def player_target(self, user_name, num):
+	def player_target(self, user_name, target_name):
 		i = 0
 		for p in self.players:
 			if p.name == user_name:
 				for t in self.players:
-					if t.name != user_name:
-						i += 1
-						if i == num:
-							p.target = t
-							t.targetedBy.append(p)
+					if t.name == target_name:
+						p.target = t
+						t.targetedBy.append(p)
 	
 	#Clears Turn Parameters for Players and Game		
 	def turn_clear(self):
+		self.exchangeCount = 0
 		for p in self.players:
 			p.played_card = None
 			p.draw = False
 			p.target = None
 			p.targetedBy = []
 			p.turn_done = False
-			p.minionFactor = 1
+			p.minionHalved = False
 			p.minionNegated = False
 			p.minionGain = 0
 			p.goldGain = 0
 			p.floorGain = 0
 			p.played_cards = {}
+			p.oreGain = 0
 	
 	#Progress Game State to Next Turn
 	#Also Handle Reaching the End
@@ -314,6 +311,7 @@ class game():
 	def start_game(self):
 		while(len(self.players) <4):
 			new_player = player(''.join(random.choice(string.ascii_letters) for _ in range(5)))
+			new_player.bot = True
 			self.players.append(new_player)
 		for p in self.players:
 			p.hand = init_hand(self.deck)
@@ -327,23 +325,39 @@ class game():
 		
 	#Get the turnout of each turn and log it	
 	def get_turn_resolution(self):
-		s = "Turn Results\n"
+		s = "Turn Results\n\n"
+		if(self.exchangeCount > 1):
+			s += str(self.exchangeCount) + " Exchange Cards were Played this Turn!\n"
+			if(self.exchangeCount == 2):
+				s += "All Exchange Players Get 1 Ore for every 3 Exchanged"
+			if(self.exchangeCount == 3):
+				s += "All Exchange Players Get 1 Ore for every 3 Exchanged AND Get Double Gold for each Ore Exchanged"
+			if(self.exchangeCount == 4):
+				s += "All Exchange Players Lose All Ore and Gain 0 Gold"
+			s += "\n\n"
 		for p in self.players:
-			s += "Player: " + p.name + "Played: " + p.played_card.name + "\n"
-			if(p.floorGain > 0):
-				s += p.name + " Rushed Forward 3 Floors. Gaining 9 Ore."
+			s += "Player: " + p.name + " Played: " + p.played_card.name + "	"
 			if(p.target != None):
-				s += p.name + " Targeted " + p.target.name + "\n"
+				s += "Targeting " + p.target.name + "\n"
 				if(p.minionNegated):
-					s += p.name + "'s Minion Was Negated!"
+					s += p.name + "'s Minion Was Negated!\n"
 				else:
-					s += p.name + " Minion Roll Result = " + p.minionRoll + "\n"
+					s += p.name + " Minion Roll Result = " + str(p.minionRoll) + "	"
 					if(p.minionSuccess):
-						s += p.name + "'s Minion Stole " + p.minionGold + "Gold!\n"
+						s += p.name + "'s Minion Stole " + str(p.minionGain) + " Gold!\n"
 					else:
 						s += p.name + "'s Minion was Unsuccessful.\n"
-			s += "Player: " + p.name + " Gained " + str(p.goldGain) +" Gold\n\n"
-		s += "Players Delve Deeper into the Mines, Progressing Forward 1 Floor and Gaining 3 Gold\n\n"
+			else:
+				s += "\n"
+			if(p.floorGain > 0):
+				s += p.name + " Rushed Forward 3 Floors\n"
+			if(p.goldGain > 0):
+				s += p.name + " Gained " + str(p.goldGain) +" Gold\n"
+			if(p.oreGain > 0):
+				s += p.name + " Gained " + str(p.oreGain) +" Ore\n"
+			s += "\n"
+		s += "\nPlayers Delve Deeper into the Mines, Progressing Forward 1 Floor, Gaining 3 Gold and 3 Ore\n\n"
+		self.turn_state = s
 	
 	#Gets available targets for player
 	def get_targets(self, user_name):
@@ -352,7 +366,6 @@ class game():
 			if p.name != user_name:
 				targets.append(p.name)
 		return targets
-
 		
 	#Gets card played by player
 	def get_played_card(self, user_name):
@@ -365,14 +378,39 @@ class game():
 		for p in self.players:
 			if p.name == user_name:
 				return p
-		
 	
 	#Checks if all players have finished playing a card this turn
 	def check_turn(self):
+		self.handleBots()
 		for p in self.players:
 			if not p.turn_done:
 				return False
 		return True	
+	
+	#Handle Bot Players
+	def handleBots(self):
+		for p in self.players:
+			if not p.bot or p.turn_done:
+				continue
+
+			#Find playable cards
+			playable_cards = [i for i, c in enumerate(p.hand) if c.cost <= p.gold]
+			if not playable_cards:
+				self.player_done(p.name)
+
+			card_index = random.choice(playable_cards)
+			card = p.hand[card_index]
+
+			#If Minion
+			target = None
+			if card.card_type == "Minion":
+				targets = self.get_targets(p.name)
+				target = random.choice(targets)
+				self.player_target(p.name,target)
+				
+			self.player_play(p.name, card_index)
+			self.player_done(p.name)
+		
 		
 	#After all players have played a card, this will process the effects of the cards and update the player stats
 	def calculate_game_state(self):
@@ -383,6 +421,8 @@ class game():
 		for key in self.played_cards:
 			if self.played_cards[key].name == "Rush":
 				player = self.get_player(key)
+				player.floorGain = 3
+				player.oreGain = 9
 				player.floor += 3
 				player.ore += 9
 			if self.played_cards[key].name == "Exchange":
@@ -395,17 +435,24 @@ class game():
 				minion_players.append(player)
 		for p in exchange_players:
 			if exchange_counter == 1:
+				p.goldGain += p.ore
 				p.gold += p.ore
 				p.ore = 0
 			if exchange_counter == 2:
+				p.goldGain += p.ore
 				p.gold += p.ore
+				p.oreGain = p.ore // 3
 				p.ore = p.ore // 3
 			if exchange_counter == 3:
+				p.goldGain += p.ore * 2
 				p.gold += p.ore * 2
+				p.oreGain = p.ore // 3
 				p.ore = p.ore // 3
 			if exchange_counter == 4:
 				p.ore = 0
 		self.resolveMinions(minion_players)
+		
+		self.exchangeCount = exchange_counter
 		
 	#Figure out the Winner
 	def get_winner(self):
@@ -461,7 +508,7 @@ class game():
 				if(untargeted_attackers == len(attackers)):
 					victim.minionNegated = True
 					for attacker in attackers:
-						attacker.minionFactor = 0.5
+						attacker.minionHalved = True
 						
 		#Check Remaining Minion Negation
 		for victim, attackers in target_map.items():
@@ -480,15 +527,24 @@ class game():
 		stolen = 0
 		if player.played_card.name == "Goblin":
 			if dieRoll >= 4:
-				stolen = player.target.steal_gold(2 * player.minionFactor)
+				if(player.minionHalved):
+					stolen = player.target.steal_gold(1)
+				else:
+					stolen = player.target.steal_gold(2)
 				player.minionSuccess = True
 		if player.played_card.name == "Hitman":
 			if dieRoll >= 3:
-				stolen = player.target.steal_gold(6 * player.minionFactor)
-				player.minionSuccess = True
+				if(player.minionHalved):
+					stolen = player.target.steal_gold(3)
+				else:
+					stolen = player.target.steal_gold(6)				
+					player.minionSuccess = True
 		if player.played_card.name == "Savage":
 			if dieRoll >= 4:
-				stolen = player.target.steal_gold(12 * player.minionFactor)
+				if(player.minionHalved):
+					stolen = player.target.steal_gold(6)
+				else:
+					stolen = player.target.steal_gold(12)
 				player.minionSuccess = True
 		player.gold += stolen
 		player.minionGain = stolen
@@ -511,14 +567,16 @@ class player():
 		self.draw = False
 		self.target = None
 		self.turn_done = False
-		self.minionFactor = 0.5
+		self.minionHalved = False
 		self.minionNegated = False
 		self.minionRoll = 0
 		self.minionSuccess = False
 		self.minionGain = 0
 		self.goldGain = 0
 		self.floorGain = 0
+		self.oreGain  = 0
 		self.targetedBy = []
+		self.bot = False
 		
 	#When a player clicks to play a card, the card they played is logged and removed from their hand
 	def play_card(self, index):
@@ -643,7 +701,7 @@ async def test_game(interaction: discord.Interaction):
 	new_game = game(host)
 	games.append(new_game)
 	menu = join_menu(new_game.id)
-	await interaction.response.send_message(new_game.players[0].name + "Created a Game. Number of Players: 1",view = menu)
+	await interaction.response.send_message(new_game.players[0].name + " Created a Game.	Number of Human Players: 1	Number of Bot Players: 3",view = menu)
 
 #RUN
 client.run(token)

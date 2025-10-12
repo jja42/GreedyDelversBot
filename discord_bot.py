@@ -51,13 +51,10 @@ class join_menu(discord.ui.View):
 	@discord.ui.button(label = "Start Game", style = discord.ButtonStyle.gray)
 	async def menu2(self,interaction: discord.Interaction,button: discord.ui.Button):
 		current_game = games[self.game_id-1] 
-		if len(current_game.players) > 4: #TEMPORARILY SET TO GREATER THAN INSTEAD OF LESS THAN FOR TESTING!
-			await interaction.response.send_message("Cannot Start Game! Need More Players!",ephemeral = True)
-		else:
-			current_game.start_game()
-			current_game.get_game_state()
-			menu = draw_menu(current_game.id)
-			await interaction.response.send_message(current_game.game_state, view = menu)
+		current_game.start_game()
+		current_game.get_game_state()
+		menu = draw_menu(current_game.id)
+		await interaction.response.send_message(current_game.game_state, view = menu)
 
 #Displays a button to draw for turn 
 class draw_menu(discord.ui.View):
